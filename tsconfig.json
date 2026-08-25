@@ -1,7 +1,8 @@
 {
     "compilerOptions": {
-        "target": "es2025",
+        "target": "es2024",
         "module": "commonjs",
+        "types": ["node"],
         "rootDir": "src",
         "outDir": "dist",
         "strict": true,
