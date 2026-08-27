@@ -6,6 +6,7 @@ import { hashPassword } from "../../lib/hash";
 
 export async function registerHandler(req: Request, res: Response) {
   try {
+    // register schema check
     const result = registerSchema.safeParse(req.body);
 
     if (!result.success) {
@@ -15,10 +16,12 @@ export async function registerHandler(req: Request, res: Response) {
       });
     }
 
+    // collecting user data
     const { name, email, password } = result.data;
 
     const normalizedEmail = email.toLowerCase().trim();
 
+    // checking for existing email
     const existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
@@ -28,8 +31,10 @@ export async function registerHandler(req: Request, res: Response) {
       });
     }
 
+    // hashing password
     const passwordHash = await hashPassword(password);
 
+    // creating new user
     const newlyCreatedUser = await User.create({
       email: normalizedEmail,
       passwordHash,
@@ -38,7 +43,5 @@ export async function registerHandler(req: Request, res: Response) {
       name,
       twoFactorEnabled: false,
     });
-
-    
   } catch (err) {}
 }
