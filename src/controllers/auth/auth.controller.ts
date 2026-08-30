@@ -4,7 +4,7 @@ import { User } from "../../models/user.model";
 import { checkPassword, hashPassword } from "../../lib/hash";
 import jwt from "jsonwebtoken";
 import { sendEmail } from "../../lib/email";
-import { createAccessToken } from "../../lib/token";
+import { createAccessToken, createRefreshToken } from "../../lib/token";
 
 function getAppUrl() {
   return process.env.APP_URL || `http://localhost:${process.env.PORT}`;
@@ -63,7 +63,7 @@ export async function registerHandler(req: Request, res: Response) {
     );
 
     // creating email verify link
-    const verifyUrl = `${getAppUrl}/auth/verify-email?token=${verifyToken}`;
+    const verifyUrl = `${getAppUrl()}/auth/verify-email?token=${verifyToken}`;
 
     // send email to the user
     await sendEmail(
@@ -176,5 +176,4 @@ export async function loginHandler(req: Request, res: Response) {
       user.role,
       user.tokenVersion,
     );
-  } catch (error) {}
 }
