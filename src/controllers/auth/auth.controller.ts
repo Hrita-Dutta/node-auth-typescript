@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
-import { registerSchema } from "./auth.schema";
+import { loginSchema, registerSchema } from "./auth.schema";
 import { User } from "../../models/user.model";
-import { hashPassword } from "../../lib/hash";
+import { checkPassword, hashPassword } from "../../lib/hash";
 import jwt from "jsonwebtoken";
 import { sendEmail } from "../../lib/email";
+import { createAccessToken } from "../../lib/token";
 
 function getAppUrl() {
   return process.env.APP_URL || `http://localhost:${process.env.PORT}`;
@@ -130,4 +131,50 @@ export async function verifyEmailHandler(req: Request, res: Response) {
       message: "Internal server error",
     });
   }
+}
+
+export async function loginHandler(req: Request, res: Response) {
+  try {
+    // login schema
+    const result = loginSchema.safeParse(req.body);
+
+    if (!result.success) {
+      return res.status(400).json({
+        message: "Invalid data!",
+        errors: result.error.flatten(),
+      });
+    }
+
+    // destructuring data
+    const { email, password } = result.data;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // finding registerd user
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(400).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    // comparing bcrypted password
+    const ok = await checkPassword(password, user.passwordHash);
+
+    if (!ok) {
+      return res.status(400).json({ message: "Invalid password" });
+    }
+
+    if (!user.isEmailVerified) {
+      return res
+        .status(403)
+        .json({ message: "Please verify your email before logging in..." });
+    }
+
+    const accessToken = createAccessToken(
+      user.id,
+      user.role,
+      user.tokenVersion,
+    );
+  } catch (error) {}
 }
