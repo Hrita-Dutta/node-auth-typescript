@@ -275,3 +275,12 @@ export async function refreshHandler(req: Request, res: Response) {
     });
   }
 }
+
+export async function logoutHandler(req: Request, res: Response) {
+  res.clearCookie("refreshToken", { path: "/" });
+
+  return res.status(200).json({
+    message: "Logged out",
+    
+  });
+}
