@@ -9,6 +9,7 @@ import {
   createRefreshToken,
   verifyRefreshToken,
 } from "../../lib/token";
+import crypto from "crypto";
 
 function getAppUrl() {
   return process.env.APP_URL || `http://localhost:${process.env.PORT}`;
@@ -281,6 +282,60 @@ export async function logoutHandler(req: Request, res: Response) {
 
   return res.status(200).json({
     message: "Logged out",
-    
   });
+}
+
+export async function forgotPasswordHandler(req: Request, res: Response) {
+  const { email } = req.body as { email?: string };
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  try {
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.json({
+        message:
+          "If an account with this email exists, we will send you a reset link",
+      });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    user.resetPasswordToken = tokenHash;
+    user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await user.save();
+
+    const resetUrl = `${getAppUrl}/auth/reset-password?token=${rawToken}`;
+
+    await sendEmail(
+      user.email,
+      "Rest your password",
+      `
+        <p>Your requested password reset. Click on the below link to reset the password</p>
+        <p><a href="${resetUrl}">${resetUrl}</a></p>
+        `,
+    );
+    
+    return res.json({
+        message:
+          "If an account with this email exists, we will send you a reset link",
+      });
+  } catch (e) {
+    console.log(e);
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
 }
