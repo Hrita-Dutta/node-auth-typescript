@@ -316,7 +316,7 @@ export async function forgotPasswordHandler(req: Request, res: Response) {
 
     await user.save();
 
-    const resetUrl = `${getAppUrl}/auth/reset-password?token=${rawToken}`;
+    const resetUrl = `${getAppUrl()}/auth/reset-password?token=${rawToken}`;
 
     await sendEmail(
       user.email,
@@ -326,7 +326,7 @@ export async function forgotPasswordHandler(req: Request, res: Response) {
         <p><a href="${resetUrl}">${resetUrl}</a></p>
         `,
     );
-    
+
     return res.json({
         message:
           "If an account with this email exists, we will send you a reset link",
