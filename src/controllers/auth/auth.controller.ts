@@ -425,6 +425,7 @@ export async function googleAuthStartHandler(req: Request, res: Response) {
 }
 
 export async function googleAuthCallbackHandler(req: Request, res: Response) {
+  // get code from google callback
   const code = req.query.code as string | undefined;
 
   if (!code) {
@@ -435,6 +436,7 @@ export async function googleAuthCallbackHandler(req: Request, res: Response) {
 
   try {
     const client = getGoogleClient();
+    // token from google
     const { tokens } = await client.getToken(code);
 
     if (!tokens.id_token) {
@@ -462,6 +464,7 @@ export async function googleAuthCallbackHandler(req: Request, res: Response) {
 
     const normalizedEmail = email.toLowerCase().trim();
 
+    // find user
     let user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
@@ -499,6 +502,7 @@ export async function googleAuthCallbackHandler(req: Request, res: Response) {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
+    // Google login 
     return res.json({
       message: "Google login successfull",
       accessToken,
