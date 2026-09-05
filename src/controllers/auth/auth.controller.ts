@@ -12,6 +12,7 @@ import {
 import crypto from "crypto";
 import { hex } from "zod";
 import { OAuth2Client } from "google-auth-library";
+import { generateSecret, generateURI } from "otplib";
 
 function getAppUrl() {
   return process.env.APP_URL || `http://localhost:${process.env.PORT}`;
@@ -169,7 +170,7 @@ export async function loginHandler(req: Request, res: Response) {
     }
 
     // destructuring data
-    const { email, password } = result.data;
+    const { email, password, twoFactoreCode } = result.data;
     const normalizedEmail = email.toLowerCase().trim();
 
     // finding registerd user
@@ -193,6 +194,23 @@ export async function loginHandler(req: Request, res: Response) {
       return res
         .status(403)
         .json({ message: "Please verify your email before logging in..." });
+    }
+
+    // 2FA
+    if (user.twoFactorEnabled) {
+      if (!twoFactoreCode || typeof twoFactoreCode !== "string") {
+        return res.status(400).json({
+          message: "Two factor code is required",
+        });
+      }
+
+      if (!user.twoFactorSecret) {
+        return res.status(400).json({
+          message: "Two factor misconfigured for this account",
+        });
+      }
+
+      // verify the code using optLib
     }
 
     // create access token
@@ -502,7 +520,7 @@ export async function googleAuthCallbackHandler(req: Request, res: Response) {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    // Google login 
+    // Google login
     return res.json({
       message: "Google login successfull",
       accessToken,
@@ -512,6 +530,52 @@ export async function googleAuthCallbackHandler(req: Request, res: Response) {
         role: user.role,
         isEmailVerified: user.isEmailVerified,
       },
+    });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+}
+
+export async function twoFASetuphandler(req: Request, res: Response) {
+  const authReq = req as any;
+  const authUser = authReq.user;
+
+  if (!authUser) {
+    return res.status(401).json({
+      message: "Not authenticated",
+    });
+  }
+
+  try {
+    const user = await User.findById(authUser.id);
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const secret = generateSecret();
+
+    const issuer = "NodeAdvancedAuthApp";
+
+    const otpAuthUrl = generateURI({
+      label: user.email,
+      issuer,
+      secret,
+    });
+
+    user.twoFactorSecret = secret;
+    user.twoFactorEnabled = true;
+
+    await user.save();
+
+    return res.json({
+      message: "2FA setup is done",
+      otpAuthUrl,
+      secret,
     });
   } catch (err) {
     console.log(err);
