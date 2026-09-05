@@ -12,7 +12,7 @@ import {
 import crypto from "crypto";
 import { hex } from "zod";
 import { OAuth2Client } from "google-auth-library";
-import { generateSecret, generateURI } from "otplib";
+import { generateSecret, generateURI, verify } from "otplib";
 
 function getAppUrl() {
   return process.env.APP_URL || `http://localhost:${process.env.PORT}`;
@@ -568,7 +568,7 @@ export async function twoFASetuphandler(req: Request, res: Response) {
     });
 
     user.twoFactorSecret = secret;
-    user.twoFactorEnabled = true;
+    user.twoFactorEnabled = false;
 
     await user.save();
 
@@ -576,6 +576,64 @@ export async function twoFASetuphandler(req: Request, res: Response) {
       message: "2FA setup is done",
       otpAuthUrl,
       secret,
+    });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+}
+
+export async function twoFAVerifyHandler(req: Request, res: Response) {
+  const authReq = req as any;
+  const authUser = authReq.user;
+
+  if (!authUser) {
+    return res.status(401).json({
+      message: "Not authenticated",
+    });
+  }
+
+  const { code } = req.body as { code?: string };
+
+  if (!code) {
+    return res.status(400).json({
+      message: "Two factor code is required",
+    });
+  }
+
+  try {
+    const user = await User.findById(authUser.id);
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    if (!user.twoFactorSecret) {
+      return res.status(400).json({
+        message: "You dont have 2fa setup yet",
+      });
+    }
+
+    const isValid = verify({
+      token: code,
+      secret: user.twoFactorSecret,
+    });
+
+    if (!isValid) {
+      return res.status(400).json({
+        message: "Invalid two factor code",
+      });
+    }
+
+    user.twoFactorEnabled = true;
+    await user.save();
+
+    return res.json({
+      message: "2FA enabled successfully",
+      twoFactorEnabled: true,
     });
   } catch (err) {
     console.log(err);
